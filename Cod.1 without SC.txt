@@ -1,0 +1,122 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.cluster import KMeans
+from sklearn.feature_selection import SelectKBest, chi2
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, accuracy_score, confusion_matrix, matthews_corrcoef, \
+    adjusted_rand_score
+from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
+from imblearn.over_sampling import SMOTE
+import time
+import matplotlib.font_manager as font_manager
+
+# Load the dataset
+combined_file_path = r'C:\Users\H.A.A\Desktop\CICIDS2017.csv'
+df_original = pd.read_csv(combined_file_path)
+k_values = [20, 30, 40, 50, 60]
+
+for k in k_values:
+    print(f"\n{'=' * 70}")
+    print(f" RUNNING PIPELINE WITH SELECTKBEST k = {k} ")
+    print(f"{'=' * 70}\n")
+    df = df_original.copy()
+    target_column = ' Label'
+    df[target_column] = df[target_column].str.strip()  # Clean target column
+    df.replace([np.inf, -np.inf], np.nan, inplace=True)  # Replace infinite values
+    df.dropna(inplace=True)  # Drop rows with NaN values
+    df = df.sample(frac=0.1, random_state=42) 
+    class_counts = df[target_column].value_counts()
+    print("Class Distribution:")
+    print(class_counts)
+    X = df.drop(columns=[target_column])
+    y = df[target_column]
+    scaler = MinMaxScaler()
+    X_scaled = scaler.fit_transform(X)
+    kmeans = KMeans(n_clusters=2, random_state=42)
+    kmeans.fit(X_scaled)
+    df['Cluster'] = kmeans.labels_
+    X_scaled_with_clusters = np.column_stack((X_scaled, kmeans.labels_))
+    k_use = min(k, X_scaled.shape[1])
+    print(f"Using k = {k_use} for SelectKBest (requested: {k})")
+    selector = SelectKBest(chi2, k=k_use)
+    X_selected = selector.fit_transform(X_scaled, y)
+    X_train, X_test, y_train, y_test = train_test_split(X_selected, y, test_size=0.2, random_state=42)
+    min_samples = class_counts.min()
+    k_neighbors = min(5, max(1, min_samples - 1))
+    smote = SMOTE(random_state=42, k_neighbors=k_neighbors)
+    X_train_balanced, y_train_balanced = smote.fit_resample(X_train, y_train)
+    rf_clf = RandomForestClassifier(random_state=42)
+    rf_clf.fit(X_train_balanced, y_train_balanced)
+    y_pred = rf_clf.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred) * 100
+    report = classification_report(y_test, y_pred, output_dict=True, zero_division=0)
+    precision = report['weighted avg']['precision'] * 100
+    recall = report['weighted avg']['recall'] * 100
+    f1_score = report['weighted avg']['f1-score'] * 100
+    conf_matrix = confusion_matrix(y_test, y_pred)
+    mcc = matthews_corrcoef(y_test, y_pred)
+    print(f"Accuracy: {accuracy:.2f}%")
+    print(f"Precision: {precision:.2f}%")
+    print(f"Recall: {recall:.2f}%")
+    print(f"F1-Score: {f1_score:.2f}%")
+    print(f"Matthews Correlation Coefficient: {mcc:.2f}")
+    print(f"Confusion Matrix: \n{conf_matrix}")
+
+    if conf_matrix.shape == (2, 2):
+        true_positives = conf_matrix[1][1]
+        false_negatives = conf_matrix[1][0]
+    else:
+        true_positives = np.trace(conf_matrix)
+        false_negatives = conf_matrix.sum() - true_positives
+
+    total_positives = true_positives + false_negatives
+    if total_positives > 0:
+        false_negatives_percentage = (false_negatives / total_positives) * 100
+        true_positives_percentage = (true_positives / total_positives) * 100
+    else:
+        false_negatives_percentage = 0
+        true_positives_percentage = 0
+
+    print(f"False Negatives: {false_negatives} ({false_negatives_percentage:.2f}%)")
+    print(f"True Positives: {true_positives} ({true_positives_percentage:.2f}%)")
+
+    # Plot confusion matrix
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', cbar=False)
+    plt.title('Confusion matrix', family='times new roman', size=24)
+    plt.ylabel('Actual class',    family='times new roman', size=22)
+    plt.xlabel('Predicted class', family='times new roman', size=22)
+    plt.show()
+    ari = adjusted_rand_score(y_test, y_pred)
+    print(f"Adjusted Rand Index (ARI): {ari:.2f}")
+    metrics = {
+        'Accuracy': accuracy,
+        'Precision': precision,
+        'Recall': recall,
+        'F1-Score': f1_score
+    }
+    plt.figure(figsize=(10, 6))
+    bars = plt.bar(metrics.keys(), metrics.values(),
+                   color=['#4CAF50', '#4CAF50', '#4CAF50', '#4CAF50'], width=0.42)
+    plt.title('Evaluation metrics', family='times new roman', style='normal', size=24)
+    plt.xlabel('Metric', family='times new roman', style='normal', size=22)
+    plt.ylabel('Score (%)', family='times new roman', style='normal', size=22)
+    plt.xticks(fontproperties=font_manager.FontProperties(family='times new roman', style='normal', size=20))
+    plt.yticks(fontproperties=font_manager.FontProperties(family='times new roman', style='normal', size=20))
+    plt.ylim(0, 106)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    for bar in bars:
+        yval = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width() / 2, yval, f"{yval:.2f}",
+                 ha='center', va='bottom', fontsize=20)
+    plt.show()
+    print(f"\n✅ Completed pipeline for k = {k}\n")
+
+
+
+
+
