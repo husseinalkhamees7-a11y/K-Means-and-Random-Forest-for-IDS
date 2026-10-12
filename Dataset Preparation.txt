@@ -1,0 +1,7 @@
+===================
+Dataset Preparation
+===================
+
+Download the CICIDS2017 dataset (specifically the combined CSV file).
+
+Place the file in the root directory of this repository and ensure it is named exactly CICIDS2017.csv.
