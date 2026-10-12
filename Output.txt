@@ -1,0 +1,10 @@
+=======
+Output
+=======
+
+Upon execution, the script will:
+1. Perform the strict 80/20 stratified train-test split.
+2. Apply MinMax scaling, K-Means clustering (k=2), and SMOTE strictly on the training data.
+3. Evaluate PCA and Chi-Squared feature selection.
+4. Print the overall metrics (Target Accuracy: 99.85%) and the detailed class-wise metrics for the 12 evaluated classes in the console.
+5. Generate the confusion matrices and evaluation metric plots.
